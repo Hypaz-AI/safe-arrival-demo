@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,9 +13,9 @@
     :root {
       --bg: #f7f7f7;
       --card: #ffffff;
-      --primary: #4d6b7c;
-      --primary-light: #dce5ea;
       --text: #333;
+      --primary: #4d6b7c;
+      --primary-light: #e2eaef;
       --radius: 16px;
       --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     }
@@ -72,12 +73,27 @@
       background: #3b5260;
     }
 
-    #loading {
+    #progress {
+      margin-top: 15px;
+      height: 14px;
+      background: var(--primary-light);
+      border-radius: var(--radius);
+      overflow: hidden;
       display: none;
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: var(--primary);
+    }
+
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      transition: width 0.3s ease;
+    }
+
+    #status {
       margin-top: 10px;
+      font-weight: 600;
+      display: none;
+      color: var(--primary);
     }
 
     model-viewer {
@@ -94,75 +110,99 @@
 
   <div class="container">
     <h2>3D AR Model Generator</h2>
-    <p>Upload a technical drawing or schematic, and automatically generate a 3D model you can place in your real space with AR.</p>
+    <p>Upload a technical drawing to generate a 3D model you can view in AR.</p>
 
     <div class="card">
       <label for="fileInput" class="upload-label">Choose Image</label>
       <input id="fileInput" type="file" accept="image/*" />
 
-      <div id="loading">⏳ Generating your 3D model…</div>
+      <div id="progress">
+        <div id="progress-bar"></div>
+      </div>
+
+      <div id="status">Uploading…</div>
     </div>
 
     <div id="viewer-card" class="card" style="display:none;">
-      <h3>Generated 3D Model</h3>
-      <model-viewer id="viewer"
-        ar
-        camera-controls
-        ar-modes="webxr scene-viewer quick-look"
-        environment-image="neutral"
-        auto-rotate>
+      <h3>Your 3D Model is Ready</h3>
+      <model-viewer id="viewer" ar camera-controls ar-modes="webxr scene-viewer quick-look"
+        environment-image="neutral" auto-rotate>
       </model-viewer>
     </div>
   </div>
 
   <script>
-    const N8N_WEBHOOK_URL = "https://flows.hypaz.com/webhook-test/5fa9d76d-9678-4746-a049-88edf31aca90";
+    const START_WEBHOOK = "https://flows.hypaz.com/webhook-test/5fa9d76d-9678-4746-a049-88edf31aca90";
+    const CHECK_WEBHOOK = "https://flows.hypaz.com/webhook-test/4b602479-0648-4ada-b598-0ad8077189c9";
 
     const input = document.getElementById("fileInput");
-    const loading = document.getElementById("loading");
-    const viewer = document.getElementById("viewer");
+    const statusEl = document.getElementById("status");
+    const progressEl = document.getElementById("progress");
+    const progressBar = document.getElementById("progress-bar");
     const viewerCard = document.getElementById("viewer-card");
+    const viewer = document.getElementById("viewer");
+
+    async function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
     input.addEventListener("change", async () => {
       const file = input.files[0];
       if (!file) return;
 
-      const formData = new FormData();
-      formData.append("file", file);
+      statusEl.style.display = "block";
+      progressEl.style.display = "block";
+      statusEl.textContent = "Uploading…";
 
-      loading.style.display = "block";
-      viewerCard.style.display = "none";
+      const form = new FormData();
+      form.append("file", file);
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 180000); // 3 min safe
-      
-      let response;
-      
-      try {
-        response = await fetch(N8N_WEBHOOK_URL, {
-          method: "POST",
-          body: formData,
-          signal: controller.signal
-        });
-      } catch (err) {
-        loading.textContent = "⚠️ Connection timeout. Try again.";
-        console.error(err);
-        return;
+      // Step 1 — Send image, get job_id back
+      const startRes = await fetch(START_WEBHOOK, {
+        method: "POST",
+        body: form,
+      });
+
+      const startData = await startRes.json();
+      const jobId = startData.job_id;
+
+      statusEl.textContent = "Processing…";
+
+      let progress = 0;
+
+      // Step 2 — Poll until Tripo finishes
+      let glbUrl = null;
+      while (!glbUrl) {
+        const checkRes = await fetch(`${CHECK_WEBHOOK}?job_id=${jobId}`);
+        const checkData = await checkRes.json();
+
+        if (checkData.status === "completed") {
+          glbUrl = checkData.glb;
+          break;
+        }
+
+        // Fake progress UI
+        progress = Math.min(progress + 5, 90);
+        progressBar.style.width = progress + "%";
+
+        await sleep(2000);
       }
-      
-      clearTimeout(timeout);
-      
-      const glbBlob = await response.blob();
-      const glbUrl = URL.createObjectURL(glbBlob);
 
+      // Completed!
+      statusEl.textContent = "Model ready!";
+      progressBar.style.width = "100%";
+
+      // Load the GLB
       viewer.src = glbUrl;
 
-      loading.style.display = "none";
+      await sleep(800);
+
       viewerCard.style.display = "block";
+      progressEl.style.display = "none";
+      statusEl.style.display = "none";
     });
   </script>
 
 </body>
+
 </html>
-
-
