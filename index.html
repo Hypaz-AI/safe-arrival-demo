@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>3D AR Model Generator</title>
 
-  <!-- Google Model Viewer -->
+  <!-- Model Viewer -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
@@ -46,7 +46,7 @@
 
     .card {
       background: var(--card);
-      padding: 20px;
+      padding: 22px;
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       margin-top: 20px;
@@ -78,15 +78,15 @@
       height: 14px;
       background: var(--primary-light);
       border-radius: var(--radius);
-      overflow: hidden;
       display: none;
+      overflow: hidden;
     }
 
     #progress-bar {
-      height: 100%;
       width: 0%;
+      height: 100%;
       background: var(--primary);
-      transition: width 0.3s ease;
+      transition: width 0.25s ease;
     }
 
     #status {
@@ -110,7 +110,7 @@
 
   <div class="container">
     <h2>3D AR Model Generator</h2>
-    <p>Upload a technical drawing to generate a 3D model you can view in AR.</p>
+    <p>Upload a technical drawing and generate a 3D model you can place in AR.</p>
 
     <div class="card">
       <label for="fileInput" class="upload-label">Choose Image</label>
@@ -125,14 +125,18 @@
 
     <div id="viewer-card" class="card" style="display:none;">
       <h3>Your 3D Model is Ready</h3>
-      <model-viewer id="viewer" ar camera-controls ar-modes="webxr scene-viewer quick-look"
-        environment-image="neutral" auto-rotate>
+      <model-viewer id="viewer"
+        ar
+        camera-controls
+        ar-modes="webxr scene-viewer quick-look"
+        environment-image="neutral"
+        auto-rotate>
       </model-viewer>
     </div>
   </div>
 
   <script>
-    const START_WEBHOOK = "https://flows.hypaz.com/webhook/5fa9d76d-9678-4746-a049-88edf31aca90";
+    const START_WEBHOOK = "https://flows.hypaz.com/webhook-test/5fa9d76d-9678-4746-a049-88edf31aca90";
     const CHECK_WEBHOOK = "https://flows.hypaz.com/webhook-test/4b602479-0648-4ada-b598-0ad8077189c9";
 
     const input = document.getElementById("fileInput");
@@ -147,6 +151,7 @@
     }
 
     input.addEventListener("change", async () => {
+
       const file = input.files[0];
       if (!file) return;
 
@@ -157,7 +162,9 @@
       const form = new FormData();
       form.append("file", file);
 
-      // Step 1 — Send image, get job_id back
+      // ------------------------------
+      // STEP 1 — SEND IMAGE (start job)
+      // ------------------------------
       const startRes = await fetch(START_WEBHOOK, {
         method: "POST",
         body: form,
@@ -168,42 +175,51 @@
 
       statusEl.textContent = "Processing…";
 
+      let glbBlob = null;
       let progress = 0;
 
-      // Step 2 — Poll until Tripo finishes
-      let glbUrl = null;
-      while (!glbUrl) {
-        const checkRes = await fetch(`${CHECK_WEBHOOK}?job_id=${jobId}`);
-        const checkData = await checkRes.json();
+      // ------------------------------
+      // STEP 2 — POLLING LOOP
+      // ------------------------------
+      while (!glbBlob) {
 
-        if (checkData.status === "completed") {
-          glbUrl = checkData.glb;
-          break;
+        const checkRes = await fetch(`${CHECK_WEBHOOK}?job_id=${jobId}`);
+
+        const contentLength = checkRes.headers.get("Content-Length");
+
+        if (contentLength && parseInt(contentLength) > 0) {
+          // YES: Binary file is ready
+          const blob = await checkRes.blob();
+          if (blob.size > 0) {
+            glbBlob = blob;
+            break;
+          }
         }
 
-        // Fake progress UI
+        // NO: File not ready yet
         progress = Math.min(progress + 5, 90);
         progressBar.style.width = progress + "%";
 
         await sleep(2000);
       }
 
-      // Completed!
+      // ------------------------------
+      // STEP 3 — DISPLAY MODEL
+      // ------------------------------
       statusEl.textContent = "Model ready!";
       progressBar.style.width = "100%";
 
-      // Load the GLB
+      const glbUrl = URL.createObjectURL(glbBlob);
       viewer.src = glbUrl;
 
-      await sleep(800);
+      await sleep(600);
 
       viewerCard.style.display = "block";
-      progressEl.style.display = "none";
       statusEl.style.display = "none";
+      progressEl.style.display = "none";
     });
   </script>
 
 </body>
 
 </html>
-
