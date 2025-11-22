@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>3D AR Model Generator</title>
 
-  <!-- Model Viewer -->
+  <!-- Google Model Viewer -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
@@ -184,19 +184,15 @@
       while (!glbBlob) {
 
         const checkRes = await fetch(`${CHECK_WEBHOOK}?job_id=${jobId}`);
+        const blob = await checkRes.blob();
 
-        const contentLength = checkRes.headers.get("Content-Length");
-
-        if (contentLength && parseInt(contentLength) > 0) {
-          // YES: Binary file is ready
-          const blob = await checkRes.blob();
-          if (blob.size > 0) {
-            glbBlob = blob;
-            break;
-          }
+        // Real GLB files are ALWAYS > 100 bytes
+        if (blob.size > 100) {
+          glbBlob = blob;
+          break;
         }
 
-        // NO: File not ready yet
+        // Not ready yet
         progress = Math.min(progress + 5, 90);
         progressBar.style.width = progress + "%";
 
