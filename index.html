@@ -198,7 +198,7 @@
       });
 
       const startData = await startRes.json();
-      const jobId = startData.job_id;
+      const uuid = startData.UUID;
 
       statusEl.textContent = "Processing…";
 
@@ -208,7 +208,7 @@
       // STEP 2: polling for binary GLB file
       while (!glbBlob) {
         const checkRes =
-          await fetch(`${CHECK_WEBHOOK}?job_id=${jobId}`);
+          await fetch(`${CHECK_WEBHOOK}?UUID=${uuid}`);
 
         const blob = await checkRes.blob();
 
@@ -246,3 +246,4 @@
 </body>
 
 </html>
+
