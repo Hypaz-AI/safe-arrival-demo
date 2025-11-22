@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D AR Viewer</title>
+
+  <!-- Google Model Viewer -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 15px;
+    }
+
+    #viewer-container {
+      margin-top: 20px;
+      display: none;
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 70vh;
+      background: #f0f0f0;
+      border-radius: 10px;
+    }
+
+    #loading {
+      display: none;
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>Genera modello 3D in AR</h2>
+  <p>Carica un disegno tecnico o uno schema quotato.</p>
+
+  <input id="fileInput" type="file" accept="image/*" />
+
+  <div id="loading">⏳ Generazione modello 3D in corso...</div>
+
+  <div id="viewer-container">
+    <h3>Modello 3D generato</h3>
+    <model-viewer id="viewer"
+      ar
+      camera-controls
+      ar-modes="webxr scene-viewer quick-look"
+      environment-image="neutral"
+      auto-rotate>
+    </model-viewer>
+  </div>
+
+  <script>
+    const N8N_WEBHOOK_URL = "https://TUO-N8N/webhook/tripo-generate"; // <--- CAMBIA QUESTO
+
+    const input = document.getElementById("fileInput");
+    const loading = document.getElementById("loading");
+    const viewer = document.getElementById("viewer");
+    const viewerContainer = document.getElementById("viewer-container");
+
+    input.addEventListener("change", async () => {
+      const file = input.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      loading.style.display = "block";
+      viewerContainer.style.display = "none";
+
+      const response = await fetch(N8N_WEBHOOK_URL, {
+        method: "POST",
+        body: formData
+      });
+
+      // Recupera il GLB come blob
+      const glbBlob = await response.blob();
+      const glbUrl = URL.createObjectURL(glbBlob);
+
+      viewer.src = glbUrl;
+
+      loading.style.display = "none";
+      viewerContainer.style.display = "block";
+    });
+  </script>
+
+</body>
+</html>
