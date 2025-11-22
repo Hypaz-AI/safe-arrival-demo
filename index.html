@@ -7,7 +7,8 @@
   <title>3D AR Model Generator</title>
 
   <!-- Google Model Viewer -->
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <script type="module"
+    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
     :root {
@@ -58,7 +59,7 @@
     }
 
     .upload-label {
-      display: block;
+      display: inline-block;
       background: var(--primary);
       color: white;
       padding: 14px 20px;
@@ -96,12 +97,34 @@
       color: var(--primary);
     }
 
-    model-viewer {
+    .viewer-wrapper {
       width: 100%;
       height: 70vh;
+      margin-bottom: 20px;
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 100%;
       border-radius: var(--radius);
       background: var(--primary-light);
-      margin-top: 20px;
+    }
+
+    .ar-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 14px 20px;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: 0.2s;
+    }
+
+    .ar-btn:hover {
+      background: #3b5260;
     }
   </style>
 </head>
@@ -110,8 +133,9 @@
 
   <div class="container">
     <h2>3D AR Model Generator</h2>
-    <p>Upload a technical drawing and generate a 3D model you can place in AR.</p>
+    <p>Upload a technical drawing and generate a 3D model you can view in AR.</p>
 
+    <!-- Upload card -->
     <div class="card">
       <label for="fileInput" class="upload-label">Choose Image</label>
       <input id="fileInput" type="file" accept="image/*" />
@@ -123,21 +147,26 @@
       <div id="status">Uploading…</div>
     </div>
 
+    <!-- Viewer card -->
     <div id="viewer-card" class="card" style="display:none;">
       <h3>Your 3D Model is Ready</h3>
-      <model-viewer id="viewer"
-        ar
-        camera-controls
-        ar-modes="webxr scene-viewer quick-look"
-        environment-image="neutral"
-        auto-rotate>
-      </model-viewer>
+
+      <div class="viewer-wrapper">
+        <model-viewer id="viewer" ar camera-controls
+          ar-modes="webxr scene-viewer quick-look"
+          environment-image="neutral" auto-rotate>
+        </model-viewer>
+      </div>
+
+      <button id="arButton" class="ar-btn">Place in your space</button>
     </div>
   </div>
 
   <script>
-    const START_WEBHOOK = "https://flows.hypaz.com/webhook/5fa9d76d-9678-4746-a049-88edf31aca90";
-    const CHECK_WEBHOOK = "https://flows.hypaz.com/webhook/4b602479-0648-4ada-b598-0ad8077189c9";
+    const START_WEBHOOK =
+      "https://flows.hypaz.com/webhook/5fa9d76d-9678-4746-a049-88edf31aca90";
+    const CHECK_WEBHOOK =
+      "https://flows.hypaz.com/webhook/4b602479-0648-4ada-b598-0ad8077189c9";
 
     const input = document.getElementById("fileInput");
     const statusEl = document.getElementById("status");
@@ -150,8 +179,8 @@
       return new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    // Submit image and start job
     input.addEventListener("change", async () => {
-
       const file = input.files[0];
       if (!file) return;
 
@@ -162,12 +191,10 @@
       const form = new FormData();
       form.append("file", file);
 
-      // ------------------------------
-      // STEP 1 — SEND IMAGE (start job)
-      // ------------------------------
+      // STEP 1: send the file
       const startRes = await fetch(START_WEBHOOK, {
         method: "POST",
-        body: form,
+        body: form
       });
 
       const startData = await startRes.json();
@@ -178,30 +205,25 @@
       let glbBlob = null;
       let progress = 0;
 
-      // ------------------------------
-      // STEP 2 — POLLING LOOP
-      // ------------------------------
+      // STEP 2: polling for binary GLB file
       while (!glbBlob) {
+        const checkRes =
+          await fetch(`${CHECK_WEBHOOK}?job_id=${jobId}`);
 
-        const checkRes = await fetch(`${CHECK_WEBHOOK}?job_id=${jobId}`);
         const blob = await checkRes.blob();
 
-        // Real GLB files are ALWAYS > 100 bytes
         if (blob.size > 100) {
           glbBlob = blob;
           break;
         }
 
-        // Not ready yet
         progress = Math.min(progress + 5, 90);
         progressBar.style.width = progress + "%";
 
         await sleep(2000);
       }
 
-      // ------------------------------
-      // STEP 3 — DISPLAY MODEL
-      // ------------------------------
+      // STEP 3: set model in viewer
       statusEl.textContent = "Model ready!";
       progressBar.style.width = "100%";
 
@@ -213,6 +235,11 @@
       viewerCard.style.display = "block";
       statusEl.style.display = "none";
       progressEl.style.display = "none";
+    });
+
+    // AR activation
+    document.getElementById("arButton").addEventListener("click", () => {
+      viewer.activateAR();
     });
   </script>
 
