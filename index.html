@@ -133,11 +133,25 @@
       loading.style.display = "block";
       viewerCard.style.display = "none";
 
-      const response = await fetch(N8N_WEBHOOK_URL, {
-        method: "POST",
-        body: formData
-      });
-
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 180000); // 3 min safe
+      
+      let response;
+      
+      try {
+        response = await fetch(N8N_WEBHOOK_URL, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal
+        });
+      } catch (err) {
+        loading.textContent = "⚠️ Connection timeout. Try again.";
+        console.error(err);
+        return;
+      }
+      
+      clearTimeout(timeout);
+      
       const glbBlob = await response.blob();
       const glbUrl = URL.createObjectURL(glbBlob);
 
@@ -150,4 +164,5 @@
 
 </body>
 </html>
+
 
